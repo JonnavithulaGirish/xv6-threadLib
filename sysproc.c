@@ -90,60 +90,29 @@ sys_uptime(void)
   return xticks;
 }
 
-
-// int
-// sys_clone(void)
-// {
-//   int fcn, arg1, arg2, stack;
-//   if(argint(0,&fcn)< 0 ||
-//       argint(1,&arg1)< 0 ||
-//         argint(2,&arg2)< 0 ||
-//           argint(3,&stack)< 0)
-//           return -1;
-  
-//   return clone((void *)fcn, (void *)arg1, (void *)arg2, (void *)stack); 
-// }
-
-// int
-// sys_join(void)
-// {
-//    void **sArg=0;
-//    if(argint(0,(int *)&sArg)<0)
-//     return -1;
-//    return join(sArg);
-// }
-
-
 int
 sys_clone(void)
 {
     void * fcn = 0;
     void * arg1 = 0;
     void * arg2 = 0;
-    void * stack = 0;
+    void * sArg = 0;
 
-    if(argint(0, (int *) &fcn) < 0)
+    if(argint(0, (int *) &fcn) < 0 
+      || argint(1, (int *) &arg1) < 0 
+      || argint(2, (int *) &arg2) < 0
+      || argint(3, (int *) &sArg) < 0)
         return -1;
 
-    if(argint(1, (int *) &arg1) < 0)
-        return -1;
-    
-    if(argint(2, (int *) &arg2) < 0)
-        return -1;
-
-    if(argint(3, (int *) &stack) < 0)
-        return -1;
-
-    return clone(fcn, arg1, arg2, stack);
+    return clone(fcn, arg1, arg2, sArg);
 }
 
 int
 sys_join(void)
 {
-    void * stack = 0;
-    if(argptr( 0,(char**) &stack, sizeof(void *)) < 0){
+    void *sArg=0;
+    if(argptr( 0,(char**) &sArg, sizeof(void *)) < 0){
       return -1;
     }
-
-    return join(stack);
+    return join(sArg);
 }
