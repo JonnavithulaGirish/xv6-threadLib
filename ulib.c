@@ -110,18 +110,47 @@ memmove(void *vdst, const void *vsrc, int n)
 //Create thread_Create & thread_join
 
 
-int thread_create(void (*start_routine)(void *, void *), void *arg1, void *arg2){
-   void *stack = malloc(PGSIZE);
-   return clone(start_routine, arg1, arg2, stack);
+// int thread_create(void (*start_routine)(void *, void *), void *arg1, void *arg2){
+//    void *stack = malloc(PGSIZE);
+//    return clone(start_routine, arg1, arg2, stack);
+// }
+
+// int thread_join(){
+//   void *stack;
+//   int pid= join(&stack);
+//   if(pid >0 ){
+//     memset(stack,0,PGSIZE);
+//   }
+//   return pid;
+// }
+
+int
+thread_create(void (*start_routine)(void *, void *), void *arg1, void *arg2)
+{
+	lock_t lk;
+	lock_init(&lk);
+	lock_acquire(&lk);
+	void *stack= malloc(PGSIZE*2);
+	lock_release(&lk);
+
+	if((uint)stack % PGSIZE)
+		stack = stack + PGSIZE - (uint)stack % PGSIZE;
+
+	int result = clone(start_routine,arg1, arg2 ,stack);
+	return result;
 }
 
 int thread_join(){
-  void *stack;
-  int pid= join(&stack);
-  if(pid >0 ){
-    memset(stack,0,PGSIZE);
-  }
-  return pid;
+	void *stack = malloc(sizeof(void*));
+	int result= join(&stack);
+
+	lock_t lk;
+	lock_init(&lk);
+	lock_acquire(&lk);
+	free(stack);
+	lock_release(&lk);
+
+	return result;
 }
 
 void lock_init(lock_t *lock) {

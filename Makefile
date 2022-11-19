@@ -181,6 +181,28 @@ UPROGS=\
 	_usertests\
 	_wc\
 	_zombie\
+	_test_1\
+	_test_2\
+	_test_3\
+	_test_4\
+	_test_5\
+	_test_6\
+	_test_7\
+	_test_8\
+	_test_9\
+	_test_10\
+	_test_11\
+	_test_12\
+	_test_13\
+	_test_14\
+	_test_15\
+	_test_16\
+	_test_17\
+	_test_18\
+	_test_19\
+	_test_20\
+
+
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)
@@ -251,6 +273,10 @@ EXTRA=\
 	mkfs.c ulib.c user.h cat.c echo.c forktest.c grep.c kill.c\
 	ln.c ls.c mkdir.c rm.c stressfs.c usertests.c wc.c zombie.c\
 	printf.c umalloc.c\
+	test_1.c test_2.c test_3.c test_4.c test_5.c test_6.c\
+	test_7.c test_8.c test_9.c test_10.c test_11.c test_12.c\
+	est_13.c test_14.c test_15.c test_16.c test_17.c test_18.c\
+	test_19.c test_20.c\
 	README dot-bochsrc *.pl toc.* runoff runoff1 runoff.list\
 	.gdbinit.tmpl gdbutil\
 

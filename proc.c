@@ -106,6 +106,7 @@ found:
   // which returns to trapret.
   sp -= 4;
   *(uint*)sp = (uint)trapret;
+  p->isthread = 0; 
 
   sp -= sizeof *p->context;
   p->context = (struct context*)sp;
@@ -232,6 +233,13 @@ clone(void(*fcn)(void *, void *), void *arg1, void *arg2, void *stack)
   struct proc *np;
   struct proc *curproc = myproc();
 
+  if((uint)stack%PGSIZE!=0){
+		return -1;
+	}
+	if((curproc->sz - (uint)stack) < PGSIZE){
+		return -1;
+	}
+
   // Allocate process.
   if((np = allocproc()) == 0){
     return -1;
@@ -243,26 +251,21 @@ clone(void(*fcn)(void *, void *), void *arg1, void *arg2, void *stack)
   *np->tf = *curproc->tf;
 
   int size= PGSIZE/sizeof(void *);
-  ((uint *)stack)[size-3] = 0xFFFFFFF;
+  ((uint *)stack)[size-3] = 0xFFFFFFFF;
   ((uint *)stack)[size-2] = (uint)arg1;
   ((uint *)stack)[size-1] = (uint)arg2;
 
  //Base Pointer - stack bottom
-  np->tf->ebp = (uint)&((uint *)stack)[size-1];
+  np->tf->ebp = (uint) stack +  PGSIZE - 3 * sizeof(void*);
  // Stack Pointer - Stack top
-  np->tf->esp = (uint)&((uint *)stack)[size-3]; 
+  np->tf->esp = (uint) np->tf->ebp;
  // Intruction pointer
   np->tf->eip = (uint) fcn;
 
-  // Save address of stack
+  np->isthread =1;
+  // // Save address of stack
   np->stack = stack;
 
-  // // Initialize stack pointer to appropriate address
-  // np->tf->esp += PGSIZE - 3 * sizeof(void*);
-  // np->tf->ebp = np->tf->esp;
-
-  // // Set instruction pointer to given function
-  // np->tf->eip = (uint) fcn;
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
@@ -318,10 +321,17 @@ exit(void)
   // Pass abandoned children to init.
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->parent == curproc){
-      p->parent = initproc;
-      if(p->state == ZOMBIE)
-        wakeup1(initproc);
-    }
+      if (p->isthread == 1) {
+        //  kfree(p->kstack);
+        //  p->kstack = 0;
+        //  p->state = UNUSED;
+      }
+      else{
+        p->parent = initproc;
+        if(p->state == ZOMBIE)
+          wakeup1(initproc);
+      }
+    }  
   }
 
   // Jump into the scheduler, never to return.
@@ -344,7 +354,7 @@ wait(void)
     // Scan through table looking for exited children.
     havekids = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->parent != curproc)
+      if(p->parent != curproc || p->isthread!=0)
         continue;
       havekids = 1;
       if(p->state == ZOMBIE){
@@ -376,35 +386,34 @@ wait(void)
 
 
 
-// Wait for a chiild thread to exit and return its pid.
+// Wait for a child thread to exit and return its pid.
 // Return -1 if this process has no children threads.
 int
 join(void **stack)
 {
   struct proc *p;
-  int havekids, pid;
+  int havethreads, pid;
   struct proc *curproc = myproc();
   
   acquire(&ptable.lock);
   for(;;){
     // Scan through table looking for exited children.
-    havekids = 0;
+    havethreads = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->parent != curproc || p->pgdir != p->parent->pgdir)
+      if(p->parent != curproc ||  p->isthread!=1)
         continue;
-      havekids = 1;
+      havethreads = 1;
       if(p->state == ZOMBIE){
+        *stack = p->stack;
         // Found one.
         pid = p->pid;
         kfree(p->kstack);
         p->kstack = 0;
-        freevm(p->pgdir);
         p->pid = 0;
         p->parent = 0;
         p->name[0] = 0;
         p->killed = 0;
         p->state = UNUSED;
-        stack = p->stack;
         p->stack = 0; 
         release(&ptable.lock);
         return pid;
@@ -412,7 +421,7 @@ join(void **stack)
     }
 
     // No point waiting if we don't have any children.
-    if(!havekids || curproc->killed){
+    if(!havethreads || curproc->killed){
       release(&ptable.lock);
       return -1;
     }
@@ -591,11 +600,19 @@ int
 kill(int pid)
 {
   struct proc *p;
+  struct proc *pc;
 
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->pid == pid){
       p->killed = 1;
+      for(pc = ptable.proc; pc < &ptable.proc[NPROC]; pc++){
+         if ((pc->parent == p) && (pc->isthread == 1)){
+            pc->killed = 1;
+            if (pc->state == SLEEPING)
+               pc->state = RUNNABLE;
+         }
+      }
       // Wake process from sleep if necessary.
       if(p->state == SLEEPING)
         p->state = RUNNABLE;
