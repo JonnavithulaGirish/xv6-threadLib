@@ -144,7 +144,9 @@ void lock_init(lock_t *lock) {
 
 void lock_acquire(lock_t *lock){
   int myturn = FetchAndAdd(&lock->ticket,1);
-  while(lock->turn != myturn);
+  while(lock->turn != myturn){
+    printf(1,"ulib lock value %d\n",lock->turn);
+  }
 }
 
 void lock_release(lock_t *lock){

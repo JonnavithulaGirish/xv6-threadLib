@@ -161,6 +161,7 @@ growproc(int n)
 {
   uint sz;
   struct proc *curproc = myproc();
+  struct proc * p;
 
   sz = curproc->sz;
   if(n > 0){
@@ -171,6 +172,13 @@ growproc(int n)
       return -1;
   }
   curproc->sz = sz;
+  //keep sync between threads :: sbrk() case
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->parent == curproc && p->isthread == 1)
+        p->sz = sz;
+  }
+  release(&ptable.lock);
   switchuvm(curproc);
   return 0;
 }
@@ -321,12 +329,7 @@ exit(void)
   // Pass abandoned children to init.
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->parent == curproc){
-      if (p->isthread == 1) {
-        //  kfree(p->kstack);
-        //  p->kstack = 0;
-        //  p->state = UNUSED;
-      }
-      else{
+      if (p->isthread != 1){ 
         p->parent = initproc;
         if(p->state == ZOMBIE)
           wakeup1(initproc);
