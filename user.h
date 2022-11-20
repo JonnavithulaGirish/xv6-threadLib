@@ -44,3 +44,4 @@ int thread_join();
 void lock_acquire(lock_t *);
 void lock_release(lock_t *);
 void lock_init(lock_t *);
+void threadSync();

@@ -175,7 +175,7 @@ growproc(int n)
   //keep sync between threads :: sbrk() case
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->parent == curproc && p->isthread == 1)
+    if(p->pgdir == curproc->pgdir)
         p->sz = sz;
   }
   release(&ptable.lock);

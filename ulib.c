@@ -5,6 +5,8 @@
 #include "x86.h"
 #include "mmu.h"
 
+lock_t lk_create,lk_join;
+
 char*
 strcpy(char *s, const char *t)
 {
@@ -111,11 +113,9 @@ memmove(void *vdst, const void *vsrc, int n)
 int
 thread_create(void (*start_routine)(void *, void *), void *arg1, void *arg2)
 {
-	lock_t lk;
-	lock_init(&lk);
-	lock_acquire(&lk);
+	lock_acquire(&lk_create);
 	void *stack= malloc(PGSIZE*2);
-	lock_release(&lk);
+	lock_release(&lk_create);
 
 	if((uint)stack % PGSIZE)
 		stack = stack + PGSIZE - (uint)stack % PGSIZE;
@@ -125,30 +125,49 @@ thread_create(void (*start_routine)(void *, void *), void *arg1, void *arg2)
 }
 
 int thread_join(){
-	void *stack = malloc(sizeof(void*));
+	void *stack = 0;
 	int result= join(&stack);
 
-	lock_t lk;
-	lock_init(&lk);
-	lock_acquire(&lk);
+	lock_acquire(&lk_join);
 	free(stack);
-	lock_release(&lk);
+	lock_release(&lk_join);
 
 	return result;
 }
 
-void lock_init(lock_t *lock) {
-  lock->ticket = 0;
-  lock->turn = 0;
+// void lock_init(lock_t *lock) {
+//   lock->ticket = 0;
+//   lock->turn = 0;
+// }
+
+// void lock_acquire(lock_t *lock){
+//   int myturn = FetchAndAdd(&lock->ticket,1);
+//   while(lock->turn != myturn){
+//     printf(1,"ulib lock value %d\n",lock->turn);
+//   }
+// }
+
+// void lock_release(lock_t *lock){
+//   lock->turn = lock->turn + 1;
+// }
+
+void threadSync(){
+  lock_init(&lk_create);
+  lock_init(&lk_join);
 }
 
 void lock_acquire(lock_t *lock){
-  int myturn = FetchAndAdd(&lock->ticket,1);
-  while(lock->turn != myturn){
-    printf(1,"ulib lock value %d\n",lock->turn);
-  }
+  // The xchg is atomic.
+    while(xchg(&(lock->mutex), 1) != 0);
+    __sync_synchronize();
 }
 
 void lock_release(lock_t *lock){
-  lock->turn = lock->turn + 1;
+   __sync_synchronize();
+    asm volatile("movl $0, %0" : "+m" (lock->mutex) : );
+    return;
+}
+
+void lock_init(lock_t *lock) {
+  lock->mutex = 0;
 }
